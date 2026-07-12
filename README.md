@@ -1,20 +1,20 @@
 # Claude Usage Widget
 
-Widget desktop minimalis (Windows) untuk memantau penggunaan token Claude secara real-time, dari dua sumber data:
+A minimalist desktop widget (Windows) for monitoring Claude token usage in real time, from two data sources:
 
-- **Lokal** — context window & token per model (Opus/Sonnet/Haiku/Fable), dibaca langsung dari log Claude Code (`~/.claude/projects/**/*.jsonl`), update tiap 2 detik.
-- **Resmi** — kuota sesi 5 jam & mingguan (7 hari), dibaca dari `claude.ai/settings/usage` lewat jendela WebView2 asli (bukan Playwright/automation, jadi tidak diblokir Cloudflare), login manual sekali lalu berjalan sendiri di background.
+- **Local** — context window & tokens per model (Opus/Sonnet/Haiku/Fable), read directly from Claude Code logs (`~/.claude/projects/**/*.jsonl`), updated every 2 seconds.
+- **Official** — 5-hour session quota & weekly (7-day) quota, read from `claude.ai/settings/usage` through a native WebView2 window (not Playwright/automation, so it isn't blocked by Cloudflare), login once manually and it keeps running in the background.
 
-## Fitur
+## Features
 
-- Ring gauge context window (warna berubah di ambang 75%/85%)
-- Badge per model, bisa diklik buat "pin" ring ke model tertentu
-- Bar kuota sesi & mingguan (termasuk per-model kalau ada, mis. Fable)
-- Notifikasi/nudge: saran `/compact` atau chat baru saat context penuh, saran turun model kalau Opus mendominasi token sesi
+- Context window ring gauge (color changes at the 75%/85% thresholds)
+- Per-model badges, clickable to "pin" the ring to a specific model
+- Session & weekly quota bars (including per-model breakdown when available, e.g. Fable)
+- Notifications/nudges: suggests `/compact` or a new chat when context is full, suggests switching model when Opus dominates session usage
 - System tray (minimize, refresh, compact mode)
-- Auto-start opsional lewat Windows Startup folder
+- Optional auto-start via the Windows Startup folder
 
-## Tampilan
+## Preview
 
 | Full mode | Compact mode |
 |---|---|
@@ -22,15 +22,15 @@ Widget desktop minimalis (Windows) untuk memantau penggunaan token Claude secara
 
 ---
 
-## Persyaratan
+## Requirements
 
-- **Windows 10/11** (widget ini spesifik Windows — pakai WebView2 & system tray Windows)
-- **Python 3.9+** — cek dengan `python --version`
-- **Claude Code** sudah pernah dipakai minimal sekali (buat data lokal/context ring bisa muncul — kalau belum pernah, ring-nya akan nunjukin "Belum ada sesi ditemukan" sampai kamu mulai chat)
-- **WebView2 Runtime** — biasanya sudah otomatis terpasang di Windows 10/11 modern. Kalau belum ada, download dari [developer.microsoft.com/microsoft-edge/webview2](https://developer.microsoft.com/en-us/microsoft-edge/webview2/)
-- Akun **Claude.ai** (Free/Pro/Max) buat bagian kuota resmi (opsional — widget tetap jalan tanpa ini, cuma bagian kuota resmi yang kosong)
+- **Windows 10/11** (this widget is Windows-specific — it uses WebView2 and the Windows system tray)
+- **Python 3.9+** — check with `python --version`
+- **Claude Code** used at least once (so local context data can be found — if not, the ring will show "No session found" until you start chatting)
+- **WebView2 Runtime** — usually already installed on modern Windows 10/11. If not, download it from [developer.microsoft.com/microsoft-edge/webview2](https://developer.microsoft.com/en-us/microsoft-edge/webview2/)
+- A **Claude.ai** account (Free/Pro/Max) for the official quota section (optional — the widget still runs without it, only the official quota section stays empty)
 
-## Instalasi
+## Installation
 
 ```bash
 git clone https://github.com/abukhalid-io/claude-usage-widget.git
@@ -39,55 +39,55 @@ pip install -r requirements.txt
 python claude_usage_widget.py
 ```
 
-## Cara Pakai (Step by Step)
+## How to Use (Step by Step)
 
-1. **Jalankan widget** — `python claude_usage_widget.py`. Widget muncul di pojok kanan atas layar.
-2. **Ring context window** langsung aktif kalau kamu sudah pernah pakai Claude Code — nggak perlu setup apa-apa.
-3. **Login buat kuota resmi (sekali saja)** — begitu widget dibuka, sebuah jendela browser kecil ("Login Claude") juga otomatis terbuka di belakang layar. Login ke akun Claude.ai kamu di situ:
-   - Kalau akun kamu punya opsi email+password, langsung login seperti biasa.
-   - **Kalau akun kamu cuma bisa login lewat Google** — tombol "Continue with Google" **tidak akan berfungsi** di jendela ini (Google sengaja memblokir login dari browser tertanam/embedded, ini kebijakan keamanan Google sendiri, bukan bug widget). Pakai tombol **"Continue with email"** sebagai gantinya, lalu masukkan kode OTP yang dikirim ke email kamu.
-4. Setelah login berhasil, jendela itu **otomatis tersembunyi** dan tidak akan muncul lagi selama sesi login masih valid (biasanya bertahan lama). Bar "Sesi (5 jam)" dan "Mingguan" di widget akan langsung terisi data asli dari akun kamu.
-5. Widget sekarang jalan sendiri di background, update terus — cukup dibiarkan terbuka (atau minimize ke tray).
+1. **Run the widget** — `python claude_usage_widget.py`. The widget appears in the top-right corner of the screen.
+2. **The context window ring** activates immediately if you've already used Claude Code before — no setup needed.
+3. **Log in for official quota data (one time only)** — as soon as the widget opens, a small browser window ("Login Claude") also opens automatically behind it. Log in to your Claude.ai account there:
+   - If your account has an email+password option, just log in normally.
+   - **If your account can only log in via Google** — the "Continue with Google" button **will not work** in this window (Google deliberately blocks login from embedded browsers, this is Google's own security policy, not a widget bug). Use the **"Continue with email"** button instead, then enter the OTP code sent to your email.
+4. Once logged in successfully, that window **hides itself automatically** and won't reappear as long as the login session stays valid (usually lasts a long time). The "Session (5 hours)" and "Weekly" bars in the widget will immediately fill in with real data from your account.
+5. The widget now runs on its own in the background, updating continuously — just leave it open (or minimize it to the tray).
 
-### Kalau sesi login habis
+### If the login session expires
 
-Kadang-kadang sesi login expired (biasanya setelah beberapa minggu). Widget akan otomatis mendeteksi ini, menampilkan status "sesi login habis" di bagian kuota resmi, dan jendela browser kecil itu **muncul lagi sendiri** minta kamu login ulang — tidak perlu restart widget.
+Sometimes the login session expires (usually after a few weeks). The widget will automatically detect this, show a "session expired" status in the official quota section, and the small browser window will **reappear on its own** asking you to log in again — no need to restart the widget.
 
-### Auto-start saat Windows menyala (opsional)
+### Auto-start on Windows boot (optional)
 
-Biar widget otomatis jalan tiap kali login Windows, tanpa jendela console yang muncul:
+To have the widget run automatically every time you log into Windows, with no console window showing:
 
-1. Tekan `Win + R`, ketik `shell:startup`, Enter
-2. Buat shortcut baru di folder itu yang mengarah ke `pythonw.exe` (bukan `python.exe`, biar tanpa console) dengan argumen path ke `claude_usage_widget.py`
-   - Contoh target shortcut: `"C:\Path\ke\Python\pythonw.exe" "C:\Path\ke\claude-usage-widget\claude_usage_widget.py"`
+1. Press `Win + R`, type `shell:startup`, Enter
+2. Create a new shortcut in that folder pointing to `pythonw.exe` (not `python.exe`, so no console appears) with an argument pointing to `claude_usage_widget.py`
+   - Example shortcut target: `"C:\Path\to\Python\pythonw.exe" "C:\Path\to\claude-usage-widget\claude_usage_widget.py"`
 
-## Kontrol
+## Controls
 
-| Aksi | Fungsi |
+| Action | Function |
 |---|---|
-| Klik-tahan body widget | Geser posisi widget |
-| Tombol `×` | Minimize ke system tray (bukan quit) |
-| Klik kanan ikon tray | Menu Show/Hide, Refresh sekarang, Compact mode, Quit |
-| Tombol `▭` di header | Toggle compact mode (ringkas, cuma ring) |
-| Klik badge model (Opus/Sonnet/Haiku/Fable) | "Pin" ring ke model itu — klik lagi buat lepas, ring balik auto-ikut model yang lagi aktif |
+| Click-and-hold the widget body | Move the widget |
+| `×` button | Minimize to system tray (not quit) |
+| Right-click the tray icon | Show/Hide, Refresh now, Compact mode, Quit menu |
+| `▭` button in the header | Toggle compact mode (minimal, ring only) |
+| Click a model badge (Opus/Sonnet/Haiku/Fable) | "Pin" the ring to that model — click again to unpin, ring goes back to auto-following the currently active model |
 
-## Memahami Tampilan
+## Understanding the Display
 
-- **Ring besar (context window)** — seberapa penuh percakapan yang SEDANG kamu buka sekarang (context lokal, dari log Claude Code). Ini beda dari kuota di bawahnya!
-- **Badge Opus/Sonnet/Haiku/Fable** — total token yang dipakai tiap model di sesi/chat yang sedang aktif.
-- **Bar "Sesi (5 jam)" & "Mingguan"** — kuota resmi dari akun Claude.ai kamu (rate limit langganan Pro/Max), independen dari chat mana yang lagi dibuka.
-- **Toast peringatan kuning** — muncul otomatis saat context window hampir penuh atau saat Opus mendominasi pemakaian token sesi.
+- **Large ring (context window)** — how full the conversation you currently have open is (local context, from Claude Code logs). This is different from the quota below it!
+- **Opus/Sonnet/Haiku/Fable badges** — total tokens used per model in the currently active session/chat.
+- **"Session (5 hours)" & "Weekly" bars** — official quota from your Claude.ai account (Pro/Max subscription rate limit), independent of which chat is currently open.
+- **Yellow warning toast** — appears automatically when the context window is nearly full or when Opus dominates the session's token usage.
 
 ## Troubleshooting
 
-| Masalah | Solusi |
+| Problem | Solution |
 |---|---|
-| Ring nunjukin "Belum ada sesi ditemukan" | Belum pernah pakai Claude Code di komputer ini — buka Claude Code, chat sekali, lalu cek lagi |
-| "Continue with Google" error / gagal login | Pakai "Continue with email" di jendela login (lihat bagian Cara Pakai) |
-| Bar kuota resmi kosong terus / "tidak ketemu" | Jendela login mungkin tertutup sebelum selesai — jalankan ulang widget, biarkan jendela login terbuka sampai selesai |
-| Widget hilang setelah diklik `×` | Itu memang minimize ke tray, bukan tertutup — cek ikon di system tray (area jam Windows) |
-| Widget dobel/nggak sinkron | Jangan jalankan `python claude_usage_widget.py` dua kali bersamaan |
+| Ring shows "No session found" | Claude Code hasn't been used on this computer yet — open Claude Code, chat once, then check again |
+| "Continue with Google" errors / login fails | Use "Continue with email" in the login window (see How to Use section) |
+| Official quota bars stay empty / "not found" | The login window may have been closed before finishing — restart the widget and leave the login window open until it completes |
+| Widget disappears after clicking `×` | That's expected — it minimizes to the tray instead of closing — check the icon in the system tray (near the clock) |
+| Widget is duplicated / out of sync | Don't run `python claude_usage_widget.py` twice at the same time |
 
-## Privasi
+## Privacy
 
-Sesi login (`webview_profile/`), data usage (`usage_data.json`), dan log debug tidak pernah di-commit ke repo ini (lihat `.gitignore`) — semuanya cuma tersimpan lokal di komputer kamu sendiri. Widget hanya membaca data lokal milikmu dan halaman usage resmi Claude.ai — tidak ada data yang dikirim ke server pihak ketiga mana pun.
+The login session (`webview_profile/`), usage data (`usage_data.json`), and debug logs are never committed to this repo (see `.gitignore`) — everything stays stored locally on your own computer. The widget only reads your own local data and the official Claude.ai usage page — no data is ever sent to any third-party server.
