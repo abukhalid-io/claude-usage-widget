@@ -697,11 +697,17 @@ class UsageWidget(QWidget):
     # Window setup: frameless, transparan, always on top, draggable
     # ------------------------------------------------------------
     def _setup_window(self):
+        # SENGAJA tanpa Qt.WindowType.Tool -- Tool window nggak pernah
+        # muncul di taskbar Windows, jadi satu-satunya cara manggil
+        # widget balik cuma lewat system tray. Tanpa Tool, widget dapet
+        # entry taskbar beneran, bisa di-minimize (tombol "_") & dipanggil
+        # balik dari situ -- penting soalnya always-on-top-nya suka
+        # ganggu waktu lagi kerja di app desain lain.
         self.setWindowFlags(
             Qt.WindowType.FramelessWindowHint
             | Qt.WindowType.WindowStaysOnTopHint
-            | Qt.WindowType.Tool  # tidak muncul di taskbar
         )
+        self.setWindowIcon(build_tray_icon())
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self._apply_target_size()
 
@@ -781,6 +787,13 @@ class UsageWidget(QWidget):
         self.compact_btn = _mini_btn("▭", "Toggle compact mode")
         self.compact_btn.clicked.connect(self._toggle_compact_mode)
         header.addWidget(self.compact_btn)
+
+        # Minimize ke taskbar -- kepakai kalau widget-nya (always-on-top)
+        # lagi ganggu, mis. waktu kerja di software desain. Beda dari
+        # close_btn (`x`) yang minimize ke system tray.
+        self.minimize_btn = _mini_btn("─", "Minimize ke taskbar")
+        self.minimize_btn.clicked.connect(self.showMinimized)
+        header.addWidget(self.minimize_btn)
 
         self.close_btn = QPushButton("×")
         self.close_btn.setFixedSize(20, 20)
