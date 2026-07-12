@@ -54,6 +54,9 @@ REFRESH_INTERVAL_SECONDS = 180          # kuota nggak berubah tiap detik, 3 meni
 LOGIN_POLL_INTERVAL_SECONDS = 3
 LOGIN_TIMEOUT_SECONDS = 900              # 15 menit buat login manual pertama kali
 
+ONSCREEN_POS = (40, 60)      # posisi kalau memang perlu keliatan (login manual)
+OFFSCREEN_POS = (-3000, -3000)  # posisi kalau sesi udah valid, jangan keliatan sama sekali
+
 window = None  # diisi setelah create_window
 
 
@@ -232,6 +235,7 @@ def worker():
                         LOGGED_IN_FLAG.unlink()
                     write_status("session_expired", "Sesi login sudah tidak valid, perlu login ulang")
                     try:
+                        window.move(*ONSCREEN_POS)
                         window.show()
                     except Exception:
                         pass
@@ -266,17 +270,23 @@ def worker():
 def run():
     global window
     PROFILE_DIR.mkdir(parents=True, exist_ok=True)
-    # SELALU dibuat visible dulu -- window yang dibuat hidden=True dari
-    # awal ternyata WebView2-nya nggak sepenuhnya render/load kontennya
-    # (evaluate_js balikin body kosong), bikin sesi valid kedeteksi salah
-    # sebagai "logged out". Kalau sesi masih valid, `worker()` bakal
-    # nyembunyiin window ini lagi dalam beberapa detik (lihat window.hide()
-    # di kedua tempat: abis first-login sukses, dan abis parse sukses).
+    # SELALU dibuat visible=True (bukan hidden=True) -- window yang dibuat
+    # hidden dari awal ternyata WebView2-nya nggak sepenuhnya render/load
+    # kontennya (evaluate_js balikin body kosong), bikin sesi valid
+    # kedeteksi salah sebagai "logged out". Tapi "visible" nggak harus
+    # berarti keliatan DI LAYAR -- kalau sesi login udah ada, window ini
+    # dibuat DI LUAR LAYAR (OFFSCREEN_POS) supaya nggak sempat "flash"
+    # nongol/numpuk-tindih widget utama tiap startup. Baru dipindah balik
+    # ke ONSCREEN_POS kalau memang perlu login manual (lihat worker()).
+    already_logged_in = LOGGED_IN_FLAG.exists()
+    start_x, start_y = OFFSCREEN_POS if already_logged_in else ONSCREEN_POS
     window = webview.create_window(
         "Login Claude (biarkan terbuka)",
         USAGE_URL,
         width=900,
         height=750,
+        x=start_x,
+        y=start_y,
         hidden=False,
     )
     webview.start(

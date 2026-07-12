@@ -579,6 +579,44 @@ class RingProgress(QWidget):
         painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, self._center_text)
 
 
+class MiniRing(QWidget):
+    """Ring kuota kecil buat compact mode -- versi ringkas dari
+    RingProgress (nggak pakai bezel neumorphic/inner shadow, detail
+    segitu kekecilan buat ukuran mini kayak gini)."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._pct = 0.0
+        self._color = QColor("#4ade80")
+        self.setFixedSize(40, 40)
+
+    def set_value(self, pct: float, color_hex: str):
+        self._pct = max(0.0, min(100.0, pct))
+        self._color = QColor(color_hex)
+        self.update()
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        margin = 3
+        rect = QRectF(margin, margin, self.width() - margin * 2, self.height() - margin * 2)
+
+        track_pen = QPen(QColor(255, 255, 255, 30), 4)
+        track_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        painter.setPen(track_pen)
+        painter.drawArc(rect, 0, 360 * 16)
+
+        prog_pen = QPen(self._color, 4)
+        prog_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        painter.setPen(prog_pen)
+        span_angle = int(360 * (self._pct / 100.0) * 16)
+        painter.drawArc(rect, 90 * 16, -span_angle)
+
+        painter.setPen(QColor("#e4e4e7"))
+        painter.setFont(QFont("Segoe UI", 8, QFont.Weight.Bold))
+        painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, f"{int(self._pct)}%")
+
+
 class ModelBadge(QLabel):
     """Badge model yang bisa diklik (pill) -- klik buat "pin" ring gauge
     ke keluarga model ini, klik lagi buat lepas pin (balik ngikutin model
@@ -772,6 +810,60 @@ class UsageWidget(QWidget):
         body.setAlignment(Qt.AlignmentFlag.AlignHCenter)
         self.ring = RingProgress(self.card)
         body.addWidget(self.ring, alignment=Qt.AlignmentFlag.AlignHCenter)
+
+        # Nama model aktif -- cuma kelihatan di compact mode (di full
+        # mode nama model udah ada di context_label bagian bawah, jadi
+        # nggak perlu dobel).
+        self.compact_model_label = QLabel()
+        self.compact_model_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.compact_model_label.setStyleSheet(
+            "color: #a1a1aa; font-size: 10px; background: transparent;"
+        )
+        self.compact_model_label.hide()
+        body.addWidget(self.compact_model_label, alignment=Qt.AlignmentFlag.AlignHCenter)
+
+        # Ring kuota mini (sesi/mingguan/per-model) -- cuma kelihatan di
+        # compact mode, versi ringkas dari bar vertikal di
+        # details_container (yang disembunyikan waktu compact).
+        self.compact_quota_row = QWidget()
+        compact_quota_layout = QHBoxLayout(self.compact_quota_row)
+        compact_quota_layout.setContentsMargins(0, 4, 0, 0)
+        compact_quota_layout.setSpacing(6)
+
+        def _mini_quota_unit():
+            unit = QWidget()
+            v = QVBoxLayout(unit)
+            v.setContentsMargins(0, 0, 0, 0)
+            v.setSpacing(2)
+            ring = MiniRing()
+            v.addWidget(ring, alignment=Qt.AlignmentFlag.AlignHCenter)
+            caption = QLabel()
+            caption.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            caption.setStyleSheet("color: #71717a; font-size: 8px; background: transparent;")
+            v.addWidget(caption)
+            return unit, ring, caption
+
+        self.compact_session_unit, self.compact_session_ring, self.compact_session_caption = _mini_quota_unit()
+        self.compact_session_caption.setText("Sesi")
+        compact_quota_layout.addWidget(self.compact_session_unit)
+
+        self.compact_weekly_unit, self.compact_weekly_ring, self.compact_weekly_caption = _mini_quota_unit()
+        self.compact_weekly_caption.setText("All")
+        compact_quota_layout.addWidget(self.compact_weekly_unit)
+
+        # Slot kuota per-model (mis. "Fable") -- sama pola-nya kayak
+        # self.model_quota_rows: siapin beberapa slot, sembunyiin/dipakai
+        # sesuai data yang beneran ada, biar layout nggak goyang tiap tick.
+        self.compact_model_rings = []
+        for _ in range(2):
+            unit, ring, caption = _mini_quota_unit()
+            unit.setVisible(False)
+            compact_quota_layout.addWidget(unit)
+            self.compact_model_rings.append((unit, ring, caption))
+
+        self.compact_quota_row.hide()
+        body.addWidget(self.compact_quota_row, alignment=Qt.AlignmentFlag.AlignHCenter)
+
         outer.addLayout(body)
 
         # --- Container SATU widget buat semua detail (badge, context,
@@ -791,6 +883,12 @@ class UsageWidget(QWidget):
         model_grid = QGridLayout(self.model_grid_widget)
         model_grid.setContentsMargins(0, 0, 0, 0)
         model_grid.setSpacing(6)
+        # Kolom dipaksa sama lebar -- tanpa ini, badge dengan teks panjang
+        # (mis. "Sonnet · 1.3M") minta lebar sesuai sizeHint-nya sendiri,
+        # bikin grid total lebih lebar dari card dan sudut pill-nya
+        # kepotong tembus lewat tepi window (kelihatan "berantakan").
+        model_grid.setColumnStretch(0, 1)
+        model_grid.setColumnStretch(1, 1)
 
         self.model_badges = {}
         families = list(MODEL_FAMILY_COLORS.keys())  # ["opus", "sonnet", "haiku", "fable"]
@@ -798,6 +896,7 @@ class UsageWidget(QWidget):
             badge = ModelBadge(family)
             badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
             badge.setFixedHeight(22)
+            badge.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
             badge.clicked.connect(self._on_model_badge_clicked)
             model_grid.addWidget(badge, i // 2, i % 2)
             self.model_badges[family] = badge
@@ -870,15 +969,17 @@ class UsageWidget(QWidget):
 
         outer.addWidget(self.details_container)
 
-        # --- Toast peringatan (tetap kelihatan walau compact) ---
+        # --- Toast peringatan ---
         self.toast = ToastLabel(self.card)
         outer.addWidget(self.toast)
 
         outer.addStretch()
 
-        # Satu-satunya yang disembunyikan saat compact mode -- lihat komentar
-        # di atas soal kenapa dibungkus satu container, bukan di-hide 1-per-1.
-        self._full_mode_widgets = [self.details_container]
+        # Disembunyikan saat compact mode. Toast ikut disembunyikan juga --
+        # compact mode artinya "cuma ring", paragraf peringatan panjang
+        # (bisa 3-4 baris) bikin window jadi ketinggian & wrap-nya jelek
+        # di window sempit. Toast pesan detail tetap kelihatan di mode full.
+        self._full_mode_widgets = [self.details_container, self.toast]
 
     @staticmethod
     def _build_quota_row(label_text: str):
@@ -912,11 +1013,14 @@ class UsageWidget(QWidget):
             """
         )
 
-    def _set_quota_row(self, text_label: QLabel, bar: QProgressBar, name: str, pct_used, reset_text: str):
+    def _set_quota_row(self, text_label: QLabel, bar: QProgressBar, name: str, pct_used, reset_text: str,
+                        ring: "MiniRing | None" = None):
         if pct_used is None:
             text_label.setText(f"{name} — tidak ada data")
             bar.setValue(0)
             self._style_quota_bar(bar, "#3f3f46")
+            if ring is not None:
+                ring.set_value(0, "#3f3f46")
             return
         text_label.setText(f"{name} · {int(pct_used)}% used" + (f" · {reset_text}" if reset_text else ""))
         bar.setValue(max(0, min(100, int(pct_used))))
@@ -927,6 +1031,8 @@ class UsageWidget(QWidget):
         else:
             color = "#4ade80"
         self._style_quota_bar(bar, color)
+        if ring is not None:
+            ring.set_value(pct_used, color)
 
     def _setup_timer(self):
         self.timer = QTimer(self)
@@ -999,7 +1105,7 @@ class UsageWidget(QWidget):
     # nggak kepotong tepi window (itu yang kemarin kelihatan kayak kotak
     # nggak transparan di bagian bawah).
     _BASE_HEIGHT_FULL = 535
-    _BASE_HEIGHT_COMPACT = 260
+    _BASE_HEIGHT_COMPACT = 240
     _BASE_WIDTH_FULL = 300
     _BASE_WIDTH_COMPACT = 220
     _SHADOW_MARGIN = 14
@@ -1009,10 +1115,47 @@ class UsageWidget(QWidget):
 
     def _apply_target_size(self):
         width = self._BASE_WIDTH_COMPACT if self._compact_mode else self._BASE_WIDTH_FULL
-        self.resize(
-            width + 2 * self._SHADOW_MARGIN,
-            self._target_height() + 2 * self._SHADOW_MARGIN,
-        )
+        target_w = width + 2 * self._SHADOW_MARGIN
+        target_h = self._target_height() + 2 * self._SHADOW_MARGIN
+
+        # setFixedSize (bukan cuma resize) -- resize() ternyata bisa
+        # ke-override sama layout minimum size hint dari sisa konten yang
+        # nggak keliatan. setFixedSize ngunci minimum & maximum sekaligus,
+        # jadi Qt-nya sendiri (self.size()) udah benar. TAPI khusus window
+        # frameless+translucent di Windows, bikin window LEBIH KECIL dari
+        # ukuran sebelumnya lewat setFixedSize doang seringkali nggak
+        # bikin HWND (window OS asli) ikut mengecil -- Qt-nya benar, tapi
+        # jendela Windows-nya masih nyisain area kosong seukuran yang
+        # lama (DWM nggak nge-release backing store lama). Hide -> resize
+        # -> show maksa DWM bikin ulang window dari nol di ukuran baru.
+        was_visible = self.isVisible()
+        if was_visible:
+            self.hide()
+        self.setFixedSize(target_w, target_h)
+        if was_visible:
+            self.show()
+
+    def _sync_content_height(self):
+        """Selaraskan tinggi window ke tinggi konten SEBENARNYA. Angka
+        _BASE_HEIGHT_* di atas cuma perkiraan awal -- gampang meleset
+        begitu jumlah baris berubah-ubah (badge model, baris kuota
+        per-model, toast peringatan, dst), bikin card ke-squeeze lebih
+        pendek dari kontennya sehingga badge/baris jadi numpuk satu
+        sama lain. Dipanggil tiap abis konten di-update (_tick) dan
+        abis toggle compact mode, supaya window selalu pas."""
+        if not hasattr(self, "card"):
+            return
+        self.card.layout().activate()
+        content_h = self.card.sizeHint().height()
+        target_h = content_h + 2 * self._SHADOW_MARGIN
+        if abs(target_h - self.height()) <= 1:
+            return
+        was_visible = self.isVisible()
+        if was_visible:
+            self.hide()
+        self.setFixedHeight(target_h)
+        if was_visible:
+            self.show()
 
     def _toggle_compact_mode(self):
         self._compact_mode = not self._compact_mode
@@ -1021,7 +1164,10 @@ class UsageWidget(QWidget):
 
         for w in self._full_mode_widgets:
             w.setVisible(not self._compact_mode)
+        self.compact_model_label.setVisible(self._compact_mode)
+        self.compact_quota_row.setVisible(self._compact_mode)
         self._apply_target_size()
+        self._sync_content_height()
 
     # ------------------------------------------------------------
     # Update tampilan tiap tick berdasarkan data dari simulator/sumber asli
@@ -1033,6 +1179,7 @@ class UsageWidget(QWidget):
 
         if state.status != "ok":
             self._render_non_ok_state(state)
+            self._sync_content_height()
             return
 
         active_family = family_key_for_model(state.model)
@@ -1104,6 +1251,7 @@ class UsageWidget(QWidget):
             f"{style['label']}{pin_note} · {format_tokens(display_context_tokens)}"
             f"/{format_tokens(display_context_window)} token context{over_text}"
         )
+        self.compact_model_label.setText(f"{style['label']}{pin_note}")
         self.reset_label.setText(
             f"{state.session_messages} balasan · {format_tokens(state.session_total_tokens)} token sesi ini"
         )
@@ -1136,10 +1284,16 @@ class UsageWidget(QWidget):
                 f"Opus sudah {opus_share}% dari token sesi ini — pertimbangkan Sonnet/Haiku buat tugas ringan"
             )
 
-        if warnings:
+        # Compact mode = cuma ring -- jangan pernah nyalain toast di situ,
+        # meskipun ada warning aktif (kalau enggak, tiap tick _tick() ini
+        # bakal manggil show_message() lagi dan nimpa hide dari toggle
+        # compact mode, bikin toast nongol lagi & window jadi ketinggian).
+        if warnings and not self._compact_mode:
             self.toast.show_message(" · ".join(warnings))
         else:
             self.toast.clear_message()
+
+        self._sync_content_height()
 
     def _on_model_badge_clicked(self, family: str):
         """Klik badge model -> pin ring ke model itu. Klik badge yang sama
@@ -1169,16 +1323,19 @@ class UsageWidget(QWidget):
                 "stale": "Kuota resmi: data lama, webview source mungkin berhenti",
             }
             self.plan_status_label.setText(messages.get(w.status, w.status))
-            for text_label, bar, name in (
-                (self.session_quota_text, self.session_quota_bar, "Sesi (5 jam)"),
-                (self.weekly_quota_text, self.weekly_quota_bar, "Mingguan (semua model)"),
+            for text_label, bar, name, ring in (
+                (self.session_quota_text, self.session_quota_bar, "Sesi (5 jam)", self.compact_session_ring),
+                (self.weekly_quota_text, self.weekly_quota_bar, "Mingguan (semua model)", self.compact_weekly_ring),
             ):
                 text_label.setText(name)
                 bar.setValue(0)
                 self._style_quota_bar(bar, "#3f3f46")
+                ring.set_value(0, "#3f3f46")
             for text_label, bar in self.model_quota_rows:
                 text_label.setVisible(False)
                 bar.setVisible(False)
+            for unit, ring, caption in self.compact_model_rings:
+                unit.setVisible(False)
             return
 
         org = self.account_info.get("org", "")
@@ -1188,6 +1345,7 @@ class UsageWidget(QWidget):
         self._set_quota_row(
             self.session_quota_text, self.session_quota_bar,
             "Sesi (5 jam)", w.session_pct_used, w.session_reset_text,
+            ring=self.compact_session_ring,
         )
 
         weekly_all = next((x for x in (w.weekly or []) if x.name.lower().startswith("all")), None)
@@ -1195,21 +1353,27 @@ class UsageWidget(QWidget):
             self._set_quota_row(
                 self.weekly_quota_text, self.weekly_quota_bar,
                 weekly_all.name, weekly_all.pct_used, weekly_all.reset_text,
+                ring=self.compact_weekly_ring,
             )
         else:
             self.weekly_quota_text.setText("Mingguan — tidak ada data")
             self.weekly_quota_bar.setValue(0)
+            self.compact_weekly_ring.set_value(0, "#3f3f46")
 
         per_model = [x for x in (w.weekly or []) if x is not weekly_all]
         for i, (text_label, bar) in enumerate(self.model_quota_rows):
+            unit, ring, caption = self.compact_model_rings[i]
             if i < len(per_model):
                 item = per_model[i]
                 text_label.setVisible(True)
                 bar.setVisible(True)
-                self._set_quota_row(text_label, bar, item.name, item.pct_used, item.reset_text)
+                unit.setVisible(True)
+                caption.setText(item.name.split()[0])
+                self._set_quota_row(text_label, bar, item.name, item.pct_used, item.reset_text, ring=ring)
             else:
                 text_label.setVisible(False)
                 bar.setVisible(False)
+                unit.setVisible(False)
 
     def _render_non_ok_state(self, state: UsageState):
         """Tampilkan status non-normal (loading/no_session/error) di ring & label."""
@@ -1221,6 +1385,7 @@ class UsageWidget(QWidget):
                 "border-radius: 10px; font-size: 10px; padding: 2px 6px;"
             )
         self.context_label.setText("")
+        self.compact_model_label.setText("")
 
         messages = {
             "loading": "Membaca log Claude Code...",

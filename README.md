@@ -14,6 +14,12 @@ Widget desktop minimalis (Windows) untuk memantau penggunaan token Claude secara
 - System tray (minimize, refresh, compact mode)
 - Auto-start opsional lewat Windows Startup folder
 
+## Tampilan
+
+| Full mode | Compact mode |
+|---|---|
+| ![Full mode](screenshots/full-mode.png) | ![Compact mode](screenshots/compact-mode.png) |
+
 ---
 
 ## Persyaratan
