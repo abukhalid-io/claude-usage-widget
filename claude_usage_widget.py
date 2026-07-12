@@ -80,6 +80,11 @@ from PyQt6.QtWidgets import (
 
 CLAUDE_PROJECTS_DIR = Path.home() / ".claude" / "projects"
 CLAUDE_JSON_PATH = Path.home() / ".claude.json"
+# Claude Code bikin nama folder project dari path absolut dengan ganti
+# ":" dan "\"/"/" jadi "-" (mis. "C:\Users\bob" -> "C--Users-bob"). Dipakai
+# buat strip prefix home directory dari nama project biar portable ke
+# akun/komputer siapa saja -- JANGAN hardcode username tertentu di sini.
+_HOME_SLUG_PREFIX = str(Path.home()).replace(":", "-").replace("\\", "-").replace("/", "-") + "-"
 
 BASE_DIR = Path(__file__).resolve().parent
 WEBVIEW_SCRIPT = BASE_DIR / "webview_usage_source.py"
@@ -222,7 +227,7 @@ class ClaudeCodeUsageSource:
 
         (session_messages, session_total_tokens, model_usage,
          context_by_family, model_id_by_family) = self._cache_full_stats
-        project_name = path.parent.name.replace("C--Users-randex-", "").replace("-", " / ")
+        project_name = path.parent.name.replace(_HOME_SLUG_PREFIX, "").replace("-", " / ")
         family = family_key_for_model(model)
         context_window = MODEL_CONTEXT_WINDOWS.get(family, DEFAULT_CONTEXT_WINDOW_TOKENS)
 
@@ -660,7 +665,7 @@ class UsageWidget(QWidget):
             | Qt.WindowType.Tool  # tidak muncul di taskbar
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
-        self.resize(300, self._target_height())
+        self._apply_target_size()
 
         # Posisikan di pojok kanan atas layar saat pertama kali dibuka
         screen = QApplication.primaryScreen().availableGeometry()
@@ -670,8 +675,14 @@ class UsageWidget(QWidget):
         # Root layout di widget utama -- bikin `card` otomatis ikut resize
         # tiap kali window di-resize (toggle grafik/compact mode), jadi
         # nggak ada area transparan sisa yang nembusin jendela di belakang.
+        # Margin di sini (bukan 0) PENTING -- ngasih ruang buat shadow
+        # blur di bawah supaya nggak kepotong tepi window (kepotong =
+        # kelihatan kayak kotak nggak transparan di pinggir card).
         root_layout = QVBoxLayout(self)
-        root_layout.setContentsMargins(0, 0, 0, 0)
+        root_layout.setContentsMargins(
+            self._SHADOW_MARGIN, self._SHADOW_MARGIN,
+            self._SHADOW_MARGIN, self._SHADOW_MARGIN,
+        )
 
         # Container utama yang jadi "card" dengan background semi-transparan
         self.card = QWidget(self)
@@ -691,8 +702,8 @@ class UsageWidget(QWidget):
         # window utama) supaya bayangannya ngikutin bentuk rounded card,
         # bukan kotak penuh window yang bikin sudut bawah kelihatan kotak.
         shadow = QGraphicsDropShadowEffect(self.card)
-        shadow.setBlurRadius(30)
-        shadow.setOffset(0, 6)
+        shadow.setBlurRadius(20)
+        shadow.setOffset(0, 4)
         shadow.setColor(QColor(0, 0, 0, 160))
         self.card.setGraphicsEffect(shadow)
 
@@ -982,11 +993,26 @@ class UsageWidget(QWidget):
     # ------------------------------------------------------------
     # Toggle compact mode
     # ------------------------------------------------------------
+    # Tinggi/lebar di sini adalah ukuran VISIBLE card-nya -- window
+    # sungguhan dibikin lebih besar dari ini sebesar 2x _SHADOW_MARGIN
+    # (lihat _apply_target_size) supaya shadow-nya punya ruang buat blur,
+    # nggak kepotong tepi window (itu yang kemarin kelihatan kayak kotak
+    # nggak transparan di bagian bawah).
     _BASE_HEIGHT_FULL = 535
     _BASE_HEIGHT_COMPACT = 260
+    _BASE_WIDTH_FULL = 300
+    _BASE_WIDTH_COMPACT = 220
+    _SHADOW_MARGIN = 14
 
     def _target_height(self) -> int:
         return self._BASE_HEIGHT_COMPACT if self._compact_mode else self._BASE_HEIGHT_FULL
+
+    def _apply_target_size(self):
+        width = self._BASE_WIDTH_COMPACT if self._compact_mode else self._BASE_WIDTH_FULL
+        self.resize(
+            width + 2 * self._SHADOW_MARGIN,
+            self._target_height() + 2 * self._SHADOW_MARGIN,
+        )
 
     def _toggle_compact_mode(self):
         self._compact_mode = not self._compact_mode
@@ -995,7 +1021,7 @@ class UsageWidget(QWidget):
 
         for w in self._full_mode_widgets:
             w.setVisible(not self._compact_mode)
-        self.resize(220 if self._compact_mode else 300, self._target_height())
+        self._apply_target_size()
 
     # ------------------------------------------------------------
     # Update tampilan tiap tick berdasarkan data dari simulator/sumber asli
