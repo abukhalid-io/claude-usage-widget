@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+
+# Sesi login claude.ai (sensitif -- jangan pernah dishare/commit)
+webview_profile/
+usage_data.json
+usage_data.json.tmp
+webview_debug.txt
+webview_usage_source.lock
+
+# File auto-generated tools lain, nggak terkait project widget ini
+CONTEXT.xml
